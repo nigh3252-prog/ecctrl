@@ -37,7 +37,7 @@ export function BackboneActionBindings() {
 
     const releaseButtons = () => {
       if (hadGamepad || previousSprint) setButtonActive("b1", false);
-      if (hadGamepad || previousInteract) setButtonActive("b4", false);
+      setButtonActive("b4", false);
       hadGamepad = false;
       previousSprint = false;
       previousInteract = false;
@@ -57,11 +57,18 @@ export function BackboneActionBindings() {
         isPressed(gamepad, 6);
       const interact = isPressed(gamepad, 2);
 
+      // Clear any stale touch-button state before syncing the gamepad.
+      if (!hadGamepad) setButtonActive("b4", false);
+
       if (!hadGamepad || sprint !== previousSprint) {
         setButtonActive("b1", sprint);
       }
-      if (!hadGamepad || interact !== previousInteract) {
-        setButtonActive("b4", interact);
+
+      // Pulse the existing enter/exit action once per Square press. Keeping b4
+      // held true could retrigger vehicle access when another button changes.
+      if (interact && !previousInteract) {
+        setButtonActive("b4", true);
+        setButtonActive("b4", false);
       }
 
       hadGamepad = true;
