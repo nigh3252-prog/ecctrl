@@ -379,3 +379,166 @@ body,
     display: none;
   }
 }
+
+/* Ecctrl Backbone playtest UI */
+.backbone-hud {
+  position: fixed;
+  z-index: 10000;
+  top: max(10px, env(safe-area-inset-top));
+  left: max(10px, env(safe-area-inset-left));
+  width: min(340px, calc(100vw - 20px));
+  pointer-events: none;
+  color: #f7f7f7;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.backbone-panel {
+  pointer-events: auto;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  background: rgba(12, 15, 20, 0.86);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.backbone-panel button,
+.backbone-panel input {
+  font: inherit;
+}
+
+.backbone-panel__summary {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.backbone-panel__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #d99439;
+  box-shadow: 0 0 0 3px rgba(217, 148, 57, 0.16);
+}
+
+.backbone-panel__dot.is-connected {
+  background: #64d98b;
+  box-shadow: 0 0 0 3px rgba(100, 217, 139, 0.16);
+}
+
+.backbone-panel__chevron {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.backbone-panel__details {
+  display: grid;
+  gap: 10px;
+  max-height: min(600px, calc(100dvh - 74px));
+  overflow-y: auto;
+  padding: 0 12px 12px;
+  overscroll-behavior: contain;
+}
+
+.backbone-panel__note,
+.backbone-panel__mapping {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.backbone-panel__readout {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.backbone-panel__readout > div {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.backbone-panel__readout dt {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.backbone-panel__readout dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backbone-panel__field {
+  display: grid;
+  gap: 4px;
+}
+
+.backbone-panel__field input[type="range"] {
+  width: 100%;
+}
+
+.backbone-panel__toggles,
+.backbone-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.backbone-panel__toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.backbone-panel__actions button {
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.09);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.backbone-panel__actions button:active {
+  transform: translateY(1px);
+}
+
+html.gamepad-connected .touch-controls {
+  display: none;
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .backbone-hud {
+    top: max(6px, env(safe-area-inset-top));
+    left: max(6px, env(safe-area-inset-left));
+    width: min(300px, 46vw);
+    font-size: 12px;
+  }
+
+  .backbone-panel__summary {
+    min-height: 36px;
+    padding: 6px 10px;
+  }
+
+  .backbone-panel__details {
+    max-height: calc(100dvh - 54px);
+    padding: 0 10px 10px;
+  }
+}

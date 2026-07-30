@@ -9,6 +9,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useRef, useCallback, useState, useMemo, useLayoutEffect, type RefObject } from "react";
 import { button, useControls, folder } from "leva";
 import AnimatedCharacterModel from "./AnimatedCharacterModel";
+import { backboneGamepadState } from "./backboneGamepadState";
 import { BallCollider, CuboidCollider, CylinderCollider, MeshCollider } from "@react-three/rapier";
 import { CapsuleCahracterModel } from "./CapsuleCharacterModel";
 import { type GLTF } from 'three-stdlib'
@@ -723,9 +724,9 @@ export default function EcctrlWrapper({ paused = false, timeScale = 1 }: EcctrlW
                         backward: keys.S || keys.Down,
                         leftward: keys.A || keys.Left,
                         rightward: keys.D || keys.Right,
-                        joystick: joystickLState.current,
-                        run: keys.Shift || buttonState.current.b1,
-                        jump: keys.Space || buttonState.current.b2,
+                        joystick: backboneGamepadState.connected ? backboneGamepadState.left : joystickLState.current,
+                        run: keys.Shift || buttonState.current.b1 || backboneGamepadState.run,
+                        jump: keys.Space || buttonState.current.b2 || backboneGamepadState.jump,
                     })
                 }
                 break;
@@ -802,6 +803,29 @@ export default function EcctrlWrapper({ paused = false, timeScale = 1 }: EcctrlW
             // Update camera controls up direction
             cameraControlsRef.current.setUp(state.camera.up)
         }
+
+  // Backbone / standard gamepad camera input for the character playtest.
+  if (
+    activeController === "ecctrl" &&
+    cameraControlsRef.current &&
+    followPlayer &&
+    backboneGamepadState.connected
+  ) {
+    const lookX = backboneGamepadState.invertLookX
+      ? -backboneGamepadState.right.x
+      : backboneGamepadState.right.x;
+    const lookY = backboneGamepadState.invertLookY
+      ? -backboneGamepadState.right.y
+      : backboneGamepadState.right.y;
+
+    if (Math.abs(lookX) > 0.0001 || Math.abs(lookY) > 0.0001) {
+      cameraControlsRef.current.rotate(
+        -lookX * backboneGamepadState.lookSpeedX * delta,
+        lookY * backboneGamepadState.lookSpeedY * delta,
+        false,
+      );
+    }
+  }
 
         /**
          * Optional:

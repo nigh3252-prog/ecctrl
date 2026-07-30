@@ -13,6 +13,7 @@ import { ControlHints } from "./ui/ControlHints";
 import { InteractionPrompt } from "./ui/InteractionPrompt";
 import { CopyrightNotice } from "./ui/CopyrightNotice";
 import { useIsTouchDevice } from "./ui/useIsTouchDevice";
+import { BackboneGamepad } from "./ui/BackboneGamepad";
 
 const root = ReactDOM.createRoot(document.querySelector("#root")!);
 
@@ -44,7 +45,10 @@ const JoystickControls = () => {
 root.render(
   <>
     <Leva collapsed />
-    <JoystickControls />
+    <div className="touch-controls">
+      <JoystickControls />
+    </div>
+    <BackboneGamepad />
     <InteractionPrompt />
     <ControlHints />
     <CopyrightNotice />
