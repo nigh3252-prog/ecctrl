@@ -4,6 +4,7 @@ import {
   resetBackboneGamepadState,
   type BackboneStickState,
 } from "../backboneGamepadState";
+import { useControlStore } from "../store/useControlStore";
 
 type DiagnosticsSnapshot = {
   connected: boolean;
@@ -42,6 +43,12 @@ const INITIAL_SNAPSHOT: DiagnosticsSnapshot = {
 function isPressed(gamepad: Gamepad, buttonIndex: number): boolean {
   const button = gamepad.buttons[buttonIndex];
   return Boolean(button && (button.pressed || button.value > 0.5));
+}
+
+function buttonValue(gamepad: Gamepad, buttonIndex: number): number {
+  const button = gamepad.buttons[buttonIndex];
+  if (!button) return 0;
+  return Math.max(button.value, button.pressed ? 1 : 0);
 }
 
 function applyRadialDeadzone(
@@ -90,6 +97,26 @@ function getPressedButtons(gamepad: Gamepad): number[] {
   );
 }
 
+function getMappingText(activeController: string): string {
+  if (activeController === "vehicle1" || activeController === "vehicle2") {
+    return "Left stick steer · R2 gas · L2 reverse · A/Cross brake · Right stick camera · X/Square exit";
+  }
+  if (activeController === "vehicle3") {
+    return "Left stick throttle/yaw · Right stick pitch/roll · X/Square exit";
+  }
+  return "Left stick walk/run · Right stick camera · A/Cross jump · X/Square enter · Start fullscreen";
+}
+
+function getConnectedNote(activeController: string): string {
+  if (activeController === "vehicle1" || activeController === "vehicle2") {
+    return "Controller connected. Ground-vehicle steering, gas, reverse, brake, camera, and exit are mapped.";
+  }
+  if (activeController === "vehicle3") {
+    return "Controller connected. Both sticks control drone flight; X/Square exits the drone.";
+  }
+  return "Controller connected. Partial stick movement walks; pushing past the run threshold runs.";
+}
+
 async function copyText(text: string): Promise<boolean> {
   try {
     if (!navigator.clipboard?.writeText) throw new Error("Clipboard API unavailable");
@@ -110,6 +137,8 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 export function BackboneGamepad() {
+  const activeController = useControlStore((state) => state.activeController);
+  const activeControllerRef = useRef(activeController);
   const [expanded, setExpanded] = useState(() => {
     if (typeof window === "undefined") return true;
     const compactLandscape = window.matchMedia(
@@ -118,6 +147,9 @@ export function BackboneGamepad() {
     return !(navigator.maxTouchPoints > 0 && compactLandscape);
   });
   const [deadzone, setDeadzone] = useState(backboneGamepadState.deadzone);
+  const [runThreshold, setRunThreshold] = useState(
+    backboneGamepadState.runThreshold,
+  );
   const [lookSpeed, setLookSpeed] = useState(backboneGamepadState.lookSpeedX);
   const [invertLookX, setInvertLookX] = useState(
     backboneGamepadState.invertLookX,
@@ -132,8 +164,16 @@ export function BackboneGamepad() {
   const fullscreenError = useRef("");
 
   useEffect(() => {
+    activeControllerRef.current = activeController;
+  }, [activeController]);
+
+  useEffect(() => {
     backboneGamepadState.deadzone = deadzone;
   }, [deadzone]);
+
+  useEffect(() => {
+    backboneGamepadState.runThreshold = runThreshold;
+  }, [runThreshold]);
 
   useEffect(() => {
     backboneGamepadState.lookSpeedX = lookSpeed;
@@ -228,6 +268,9 @@ export function BackboneGamepad() {
         left.y = dpadY / magnitude;
       }
 
+      const primaryPressed = isPressed(gamepad, 0);
+      const movementMagnitude = Math.hypot(left.x, left.y);
+
       backboneGamepadState.connected = true;
       backboneGamepadState.id = gamepad.id;
       backboneGamepadState.index = gamepad.index;
@@ -236,8 +279,12 @@ export function BackboneGamepad() {
       backboneGamepadState.left.y = left.y;
       backboneGamepadState.right.x = right.x;
       backboneGamepadState.right.y = right.y;
-      backboneGamepadState.jump = isPressed(gamepad, 0);
-      backboneGamepadState.run = isPressed(gamepad, 10);
+      backboneGamepadState.jump = primaryPressed;
+      backboneGamepadState.interact = isPressed(gamepad, 2);
+      backboneGamepadState.accelerate = buttonValue(gamepad, 7) > 0.12;
+      backboneGamepadState.reverse = buttonValue(gamepad, 6) > 0.12;
+      backboneGamepadState.run =
+        movementMagnitude >= backboneGamepadState.runThreshold;
       backboneGamepadState.rawAxes = Array.from(gamepad.axes);
       backboneGamepadState.pressedButtons = getPressedButtons(gamepad);
 
@@ -249,8 +296,7 @@ export function BackboneGamepad() {
       }
       previousStartPressed.current = startPressed;
 
-      let note =
-        "Controller connected. Left stick moves, right stick looks, A/Cross jumps, L3 runs.";
+      let note = getConnectedNote(activeControllerRef.current);
       if (gamepad.mapping !== "standard") {
         note =
           "Controller connected with a non-standard mapping. Test every control and copy the diagnostics if anything is wrong.";
@@ -293,6 +339,7 @@ export function BackboneGamepad() {
 
     return [
       "Ecctrl Backbone playtest diagnostics",
+      `Active controller: ${activeController}`,
       `Connected: ${snapshot.connected}`,
       `Gamepad API available: ${snapshot.apiAvailable}`,
       `Gamepad API error: ${snapshot.apiError || "none"}`,
@@ -302,6 +349,7 @@ export function BackboneGamepad() {
       `Axes: ${axisText}`,
       `Pressed buttons: ${buttonText}`,
       `Deadzone: ${deadzone.toFixed(2)}`,
+      `Run threshold: ${runThreshold.toFixed(2)}`,
       `Look speed: ${lookSpeed.toFixed(2)}`,
       `Invert look X: ${invertLookX}`,
       `Invert look Y: ${invertLookY}`,
@@ -309,7 +357,15 @@ export function BackboneGamepad() {
       `User agent: ${navigator.userAgent}`,
       `Note: ${snapshot.note}`,
     ].join("\n");
-  }, [deadzone, invertLookX, invertLookY, lookSpeed, snapshot]);
+  }, [
+    activeController,
+    deadzone,
+    invertLookX,
+    invertLookY,
+    lookSpeed,
+    runThreshold,
+    snapshot,
+  ]);
 
   const handleCopyDiagnostics = useCallback(async () => {
     const copied = await copyText(diagnosticText);
@@ -382,6 +438,20 @@ export function BackboneGamepad() {
             </label>
 
             <label className="backbone-panel__field">
+              <span>Run threshold: {runThreshold.toFixed(2)}</span>
+              <input
+                type="range"
+                min="0.45"
+                max="0.95"
+                step="0.01"
+                value={runThreshold}
+                onChange={(event) =>
+                  setRunThreshold(Number(event.currentTarget.value))
+                }
+              />
+            </label>
+
+            <label className="backbone-panel__field">
               <span>Look speed: {lookSpeed.toFixed(1)}</span>
               <input
                 type="range"
@@ -422,7 +492,7 @@ export function BackboneGamepad() {
             </div>
 
             <p className="backbone-panel__mapping">
-              Left stick move · Right stick camera · A/Cross jump · L3 run · Start fullscreen
+              {getMappingText(activeController)}
             </p>
           </div>
         )}
