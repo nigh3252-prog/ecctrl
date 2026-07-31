@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useButtonStore, useJoystickStore } from "../../src/input";
 import { backboneGamepadState } from "../backboneGamepadState";
 import { useControlStore } from "../store/useControlStore";
@@ -49,9 +49,14 @@ function stickChanged(
  */
 export function BackboneActionBindings() {
   const activeController = useControlStore((state) => state.activeController);
+  const activeControllerRef = useRef(activeController);
   const setButtonActive = useButtonStore((state) => state.setButtonActive);
   const setJoystick = useJoystickStore((state) => state.setJoystick);
   const resetJoystick = useJoystickStore((state) => state.resetJoystick);
+
+  useEffect(() => {
+    activeControllerRef.current = activeController;
+  }, [activeController]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -114,9 +119,10 @@ export function BackboneActionBindings() {
         return;
       }
 
+      const currentController = activeControllerRef.current;
       const isGroundVehicle =
-        activeController === "vehicle1" || activeController === "vehicle2";
-      const isDrone = activeController === "vehicle3";
+        currentController === "vehicle1" || currentController === "vehicle2";
+      const isDrone = currentController === "vehicle3";
 
       if (isGroundVehicle) {
         syncJoystick(
@@ -153,7 +159,9 @@ export function BackboneActionBindings() {
         syncButton("b3", false);
       }
 
-      // Pulse the existing enter/exit action once per X/Square press.
+      // Pulse the existing enter/exit action once per X/Square press. Keeping
+      // this effect alive across controller changes prevents one held press
+      // from immediately entering and then exiting again.
       if (backboneGamepadState.interact && !previousInteract) {
         setButtonActive("b4", true);
         setButtonActive("b4", false);
@@ -170,12 +178,7 @@ export function BackboneActionBindings() {
       cancelAnimationFrame(animationFrame);
       releaseControls();
     };
-  }, [
-    activeController,
-    resetJoystick,
-    setButtonActive,
-    setJoystick,
-  ]);
+  }, [resetJoystick, setButtonActive, setJoystick]);
 
   return null;
 }
