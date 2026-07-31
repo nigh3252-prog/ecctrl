@@ -1,79 +1,166 @@
 import { useEffect } from "react";
-import { useButtonStore } from "../../src/input";
+import { useButtonStore, useJoystickStore } from "../../src/input";
+import { backboneGamepadState } from "../backboneGamepadState";
 import { useControlStore } from "../store/useControlStore";
 
-function isPressed(gamepad: Gamepad, buttonIndex: number): boolean {
-  const button = gamepad.buttons[buttonIndex];
-  return Boolean(button && (button.pressed || button.value > 0.5));
-}
+type ButtonSnapshot = {
+  b1: boolean;
+  b2: boolean;
+  b3: boolean;
+};
 
-function readConnectedGamepad(): Gamepad | null {
-  if (!("getGamepads" in navigator)) return null;
+type StickSnapshot = {
+  x: number;
+  y: number;
+};
 
-  try {
-    return Array.from(navigator.getGamepads()).find(
-      (gamepad): gamepad is Gamepad => Boolean(gamepad?.connected),
-    ) ?? null;
-  } catch {
-    return null;
-  }
+const EPSILON = 0.0001;
+
+function stickChanged(
+  previous: StickSnapshot,
+  nextX: number,
+  nextY: number,
+): boolean {
+  return (
+    Math.abs(previous.x - nextX) > EPSILON ||
+    Math.abs(previous.y - nextY) > EPSILON
+  );
 }
 
 /**
- * Adds the two action bindings requested for the Backbone playtest while
- * reusing the example's existing virtual-button control path:
+ * Bridges the mutable Backbone state into the example's existing touch-input
+ * stores so every controller mode continues through its original control path.
  *
- * - L2 / left trigger -> b1 (character sprint)
- * - X / Square       -> b4 (vehicle enter / exit)
+ * Character:
+ * - Movement, analog walk/run, jump, and camera are read directly by Ecctrl.
+ * - X / Square pulses b4 for vehicle entry.
+ *
+ * Ground vehicles:
+ * - Left stick -> steering
+ * - R2 -> gas (b3)
+ * - L2 -> reverse (b1)
+ * - A / Cross -> brake (b2)
+ * - X / Square -> exit (b4)
+ *
+ * Drone:
+ * - Left stick -> throttle / yaw
+ * - Right stick -> pitch / roll
+ * - X / Square -> exit (b4)
  */
 export function BackboneActionBindings() {
+  const activeController = useControlStore((state) => state.activeController);
   const setButtonActive = useButtonStore((state) => state.setButtonActive);
+  const setJoystick = useJoystickStore((state) => state.setJoystick);
+  const resetJoystick = useJoystickStore((state) => state.resetJoystick);
 
   useEffect(() => {
     let animationFrame = 0;
     let hadGamepad = false;
-    let previousSprint = false;
     let previousInteract = false;
+    const previousButtons: ButtonSnapshot = { b1: false, b2: false, b3: false };
+    const previousLeft: StickSnapshot = { x: 0, y: 0 };
+    const previousRight: StickSnapshot = { x: 0, y: 0 };
 
-    const releaseButtons = () => {
-      if (hadGamepad || previousSprint) setButtonActive("b1", false);
+    const syncButton = (id: keyof ButtonSnapshot, next: boolean) => {
+      if (!hadGamepad || previousButtons[id] !== next) {
+        setButtonActive(id, next);
+        previousButtons[id] = next;
+      }
+    };
+
+    const syncJoystick = (
+      id: "left" | "right",
+      previous: StickSnapshot,
+      nextX: number,
+      nextY: number,
+    ) => {
+      if (!hadGamepad || stickChanged(previous, nextX, nextY)) {
+        setJoystick(nextX, nextY, id);
+        previous.x = nextX;
+        previous.y = nextY;
+      }
+    };
+
+    const clearJoystick = (id: "left" | "right", previous: StickSnapshot) => {
+      if (!hadGamepad || previous.x !== 0 || previous.y !== 0) {
+        resetJoystick(id);
+        previous.x = 0;
+        previous.y = 0;
+      }
+    };
+
+    const releaseControls = () => {
+      setButtonActive("b1", false);
+      setButtonActive("b2", false);
+      setButtonActive("b3", false);
       setButtonActive("b4", false);
-      hadGamepad = false;
-      previousSprint = false;
+      resetJoystick("left");
+      resetJoystick("right");
+      previousButtons.b1 = false;
+      previousButtons.b2 = false;
+      previousButtons.b3 = false;
+      previousLeft.x = 0;
+      previousLeft.y = 0;
+      previousRight.x = 0;
+      previousRight.y = 0;
       previousInteract = false;
+      hadGamepad = false;
     };
 
     const poll = () => {
-      const gamepad = readConnectedGamepad();
-
-      if (!gamepad) {
-        if (hadGamepad) releaseButtons();
+      if (!backboneGamepadState.connected) {
+        if (hadGamepad) releaseControls();
         animationFrame = requestAnimationFrame(poll);
         return;
       }
 
-      const sprint =
-        useControlStore.getState().activeController === "ecctrl" &&
-        isPressed(gamepad, 6);
-      const interact = isPressed(gamepad, 2);
+      const isGroundVehicle =
+        activeController === "vehicle1" || activeController === "vehicle2";
+      const isDrone = activeController === "vehicle3";
 
-      // Clear any stale touch-button state before syncing the gamepad.
-      if (!hadGamepad) setButtonActive("b4", false);
-
-      if (!hadGamepad || sprint !== previousSprint) {
-        setButtonActive("b1", sprint);
+      if (isGroundVehicle) {
+        syncJoystick(
+          "left",
+          previousLeft,
+          backboneGamepadState.left.x,
+          backboneGamepadState.left.y,
+        );
+        clearJoystick("right", previousRight);
+        syncButton("b1", backboneGamepadState.reverse);
+        syncButton("b2", backboneGamepadState.jump);
+        syncButton("b3", backboneGamepadState.accelerate);
+      } else if (isDrone) {
+        syncJoystick(
+          "left",
+          previousLeft,
+          backboneGamepadState.left.x,
+          backboneGamepadState.left.y,
+        );
+        syncJoystick(
+          "right",
+          previousRight,
+          backboneGamepadState.right.x,
+          -backboneGamepadState.right.y,
+        );
+        syncButton("b1", false);
+        syncButton("b2", false);
+        syncButton("b3", false);
+      } else {
+        clearJoystick("left", previousLeft);
+        clearJoystick("right", previousRight);
+        syncButton("b1", false);
+        syncButton("b2", false);
+        syncButton("b3", false);
       }
 
-      // Pulse the existing enter/exit action once per Square press. Keeping b4
-      // held true could retrigger vehicle access when another button changes.
-      if (interact && !previousInteract) {
+      // Pulse the existing enter/exit action once per X/Square press.
+      if (backboneGamepadState.interact && !previousInteract) {
         setButtonActive("b4", true);
         setButtonActive("b4", false);
       }
 
       hadGamepad = true;
-      previousSprint = sprint;
-      previousInteract = interact;
+      previousInteract = backboneGamepadState.interact;
       animationFrame = requestAnimationFrame(poll);
     };
 
@@ -81,9 +168,14 @@ export function BackboneActionBindings() {
 
     return () => {
       cancelAnimationFrame(animationFrame);
-      releaseButtons();
+      releaseControls();
     };
-  }, [setButtonActive]);
+  }, [
+    activeController,
+    resetJoystick,
+    setButtonActive,
+    setJoystick,
+  ]);
 
   return null;
 }
