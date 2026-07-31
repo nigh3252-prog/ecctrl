@@ -15,6 +15,7 @@ import { CopyrightNotice } from "./ui/CopyrightNotice";
 import { useIsTouchDevice } from "./ui/useIsTouchDevice";
 import { BackboneGamepad } from "./ui/BackboneGamepad";
 import { BackboneActionBindings } from "./ui/BackboneActionBindings";
+import { BackboneVehicleCamera } from "./ui/BackboneVehicleCamera";
 
 const root = ReactDOM.createRoot(document.querySelector("#root")!);
 
@@ -67,6 +68,7 @@ root.render(
         <Bvh firstHitOnly >
           <Experience />
         </Bvh>
+        <BackboneVehicleCamera />
       </Suspense>
     </Canvas>
   </>
