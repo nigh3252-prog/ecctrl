@@ -13,6 +13,9 @@ import { ControlHints } from "./ui/ControlHints";
 import { InteractionPrompt } from "./ui/InteractionPrompt";
 import { CopyrightNotice } from "./ui/CopyrightNotice";
 import { useIsTouchDevice } from "./ui/useIsTouchDevice";
+import { BackboneGamepad } from "./ui/BackboneGamepad";
+import { BackboneActionBindings } from "./ui/BackboneActionBindings";
+import { BackboneVehicleCamera } from "./ui/BackboneVehicleCamera";
 
 const root = ReactDOM.createRoot(document.querySelector("#root")!);
 
@@ -44,7 +47,11 @@ const JoystickControls = () => {
 root.render(
   <>
     <Leva collapsed />
-    <JoystickControls />
+    <div className="touch-controls">
+      <JoystickControls />
+    </div>
+    <BackboneGamepad />
+    <BackboneActionBindings />
     <InteractionPrompt />
     <ControlHints />
     <CopyrightNotice />
@@ -61,6 +68,7 @@ root.render(
         <Bvh firstHitOnly >
           <Experience />
         </Bvh>
+        <BackboneVehicleCamera />
       </Suspense>
     </Canvas>
   </>

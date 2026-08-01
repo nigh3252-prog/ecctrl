@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: MIT
  */
 
-export { default as Ecctrl } from "./character/Ecctrl";
+export { default as Ecctrl } from "./character/EcctrlAnalog";
 export type { EcctrlProps, EcctrlHandle } from "./character/Ecctrl";
 export * from "./character/animation";
 export type { MovementInput, ReadonlyMovementInput } from "./character/types";
