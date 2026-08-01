@@ -21,6 +21,7 @@ const DEFAULT_RUN_SPEED = 5;
 const ANALOG_WALK_POINT = 0.55;
 const INPUT_EPSILON = 0.0001;
 const SPEED_UPDATE_EPSILON = 0.002;
+const MIN_CONFIGURED_SPEED = 0.001;
 
 type MovementMode = "normal" | "analog" | "run-handoff";
 
@@ -188,13 +189,20 @@ const EcctrlAnalog = forwardRef<EcctrlHandle, EcctrlProps>((props, forwardedRef)
   const analogMode = movementState.mode === "analog";
   const forceHoldRun =
     analogMode || movementState.mode === "run-handoff";
+  // Ecctrl's debug velocity arrow divides by configured walk/run speed. Keep a
+  // tiny nonzero denominator while the released stick itself supplies no move
+  // direction, so physical movement remains fully stopped.
+  const configuredAnalogSpeed = Math.max(
+    movementState.targetSpeed,
+    MIN_CONFIGURED_SPEED,
+  );
 
   return (
     <BaseEcctrl
       ref={innerRef}
       {...props}
-      maxWalkVel={analogMode ? movementState.targetSpeed : props.maxWalkVel}
-      maxRunVel={analogMode ? movementState.targetSpeed : props.maxRunVel}
+      maxWalkVel={analogMode ? configuredAnalogSpeed : props.maxWalkVel}
+      maxRunVel={analogMode ? configuredAnalogSpeed : props.maxRunVel}
       enableToggleRun={forceHoldRun ? false : props.enableToggleRun}
     />
   );
